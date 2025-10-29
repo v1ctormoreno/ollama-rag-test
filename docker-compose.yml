@@ -1,0 +1,56 @@
+version: "3.8"
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:6333/metrics"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    environment:
+      - OLLAMA_ORIGINS=*
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+
+  backend:
+    build: ./backend
+    container_name: rag-backend
+    depends_on:
+      - qdrant
+      - ollama
+    environment:
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - OLLAMA_HOST=ollama
+      - OLLAMA_PORT=11434
+      - COLLECTION_NAME=docs
+      - EMB_MODEL=sentence-transformers/all-MiniLM-L6-v2
+    volumes:
+      - ./storage:/app/storage
+    ports:
+      - "8000:8000"
+
+  ui:
+    build: ./ui
+    container_name: rag-ui
+    depends_on:
+      - backend
+    environment:
+      - BACKEND_URL=http://backend:8000
+    ports:
+      - "8501:8501"
+
+volumes:
+  qdrant_data:
+  ollama:
